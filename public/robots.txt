@@ -1,0 +1,5 @@
+﻿User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://makepng.github.io/sitemap.xml
