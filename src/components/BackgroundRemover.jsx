@@ -116,8 +116,19 @@ export default function BackgroundRemover() {
      ========================== */
   const processImage = useCallback(
     async (source, name = 'image') => {
-      // 1. Tear down previous run
+      // 1. Tear down previous run object URLs
       revokeUrls();
+
+      // 2. Create and set preview URL immediately so it shows instantly
+      let previewUrl = null;
+      if (source instanceof Blob) {
+        previewUrl = URL.createObjectURL(source);
+        originalUrlRef.current = previewUrl;
+      } else {
+        previewUrl = source;
+      }
+
+      setOriginalUrl(previewUrl);
       setPhase('processing');
       setError(null);
       setProgress(0);
@@ -125,17 +136,10 @@ export default function BackgroundRemover() {
       setStatusMessage('Initializing AI engine…');
       setFileName(name.replace(/\.[^/.]+$/, '') + '_no_bg.png');
 
-      // 2. Create a preview URL for the original
-      if (source instanceof Blob) {
-        const url = URL.createObjectURL(source);
-        originalUrlRef.current = url;
-        setOriginalUrl(url);
-      } else {
-        // source is already a displayable URL string
-        setOriginalUrl(source);
-      }
+      // 3. Allow browser to paint the uploaded image before heavy WASM inference
+      await new Promise((resolve) => setTimeout(resolve, 60));
 
-      // 3. Run @imgly/background-removal with high-quality config
+      // 4. Run @imgly/background-removal with high-quality config
       try {
         const resultBlob = await removeBackground(source, {
           model: 'large',
@@ -165,7 +169,7 @@ export default function BackgroundRemover() {
           },
         });
 
-        // 4. Store result as an object URL
+        // 5. Store result as an object URL
         const url = URL.createObjectURL(resultBlob);
         processedUrlRef.current = url;
         setProcessedUrl(url);
@@ -225,7 +229,14 @@ export default function BackgroundRemover() {
   );
 
   const handleInputChange = useCallback(
-    (e) => handleFile(e.target.files?.[0]),
+    (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        handleFile(file);
+      }
+      // Reset input value so selecting the same file again triggers onChange
+      e.target.value = '';
+    },
     [handleFile]
   );
 
@@ -353,8 +364,8 @@ export default function BackgroundRemover() {
           </div>
         </div>
 
-        {/* Sample Image CTA */}
-        <div className="mt-4 sm:mt-5 text-center">
+        {/* Sample Image CTA & Eye-Catching Speed Notice */}
+        <div className="mt-5 sm:mt-6 text-center flex flex-col items-center gap-3">
           <button
             type="button"
             onClick={(e) => {
@@ -369,6 +380,16 @@ export default function BackgroundRemover() {
             <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#26b0a1]" />
             Try Sample Image
           </button>
+
+          {/* Prominent Eye-Catching UX Speed Banner */}
+          <div className="w-full max-w-lg mt-1 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-teal-50/90 via-emerald-50/90 to-teal-50/90 border border-[#7de0d2] shadow-2xs">
+            <p className="text-xs sm:text-sm font-semibold text-[#145d56] flex items-center justify-center gap-2">
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#26b0a1] text-white text-xs shrink-0 shadow-2xs">
+                ⚡
+              </span>
+              <span><strong>1st run caches the AI model</strong> · All next removals are <strong>instant (1–2s)</strong>!</span>
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -379,14 +400,16 @@ export default function BackgroundRemover() {
     return (
       <div className="w-full max-w-2xl mx-auto px-1 sm:px-0">
         <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-5 sm:p-8 shadow-sm">
-          {/* Dimmed original preview */}
+          {/* Visible original image preview with AI scan effect */}
           {originalUrl && (
-            <div className="mb-5 sm:mb-6 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 flex items-center justify-center p-2">
+            <div className="relative mb-5 sm:mb-6 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/80 flex items-center justify-center p-3 sm:p-4">
               <img
                 src={originalUrl}
-                alt="Uploading"
-                className="max-h-48 sm:max-h-72 w-auto max-w-full object-contain opacity-30 select-none pointer-events-none"
+                alt="Uploaded photo"
+                className="max-h-56 sm:max-h-80 w-auto max-w-full object-contain select-none transition-all duration-300"
               />
+              {/* Subtle pulsing AI scanning glow */}
+              <div className="absolute inset-0 bg-gradient-to-b from-[#26b0a1]/10 via-transparent to-[#26b0a1]/10 animate-pulse pointer-events-none" />
             </div>
           )}
 
@@ -398,7 +421,7 @@ export default function BackgroundRemover() {
           >
             <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 text-brand-500 animate-spin" />
 
-            <p className="text-xs sm:text-sm font-medium text-slate-700 px-2">
+            <p className="text-sm sm:text-base font-bold text-slate-800 px-2">
               {statusMessage}
             </p>
 
@@ -409,25 +432,31 @@ export default function BackgroundRemover() {
                 aria-valuenow={Math.round(progress * 100)}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                className="bg-slate-100 rounded-full h-2 sm:h-2.5 overflow-hidden"
+                className="bg-slate-100 rounded-full h-2.5 sm:h-3 overflow-hidden shadow-inner"
               >
                 <div
-                  className="bg-gradient-to-r from-brand-400 to-brand-500 h-full rounded-full transition-all duration-500 ease-out"
+                  className="bg-gradient-to-r from-brand-400 via-brand-500 to-teal-600 h-full rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${Math.round(progress * 100)}%` }}
                 />
               </div>
-              <p className="text-[11px] sm:text-xs text-slate-400 mt-1.5 font-medium">
+              <p className="text-xs text-slate-500 mt-1.5 font-semibold">
                 {Math.round(progress * 100)}% complete
               </p>
             </div>
           </div>
 
-          {/* First-run hint */}
-          <p className="text-[11px] sm:text-xs text-slate-400 text-center mt-5 sm:mt-6 leading-relaxed px-2">
-            The first run downloads the AI model (~40 MB) to your browser cache.
-            <br className="hidden sm:inline" />
-            {' '}Subsequent removals are instant.
-          </p>
+          {/* High-Impact Eye-Catching Speed & Performance Callout */}
+          <div className="mt-6 sm:mt-7 rounded-2xl bg-gradient-to-r from-[#f0fbf9] via-[#e2f8f4] to-[#f0fbf9] border-2 border-[#7de0d2] p-4 text-center shadow-xs">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#26b0a1] text-white text-[11px] font-bold mb-1.5 shadow-2xs">
+              ⚡ One-Time AI Cache Setup
+            </div>
+            <p className="text-xs sm:text-sm text-[#145d56] font-bold">
+              The first time takes a few extra seconds to download the AI model.
+            </p>
+            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+              Once cached in your browser, all future images will process <strong>super fast & instantly (1–2s)</strong> with 100% privacy!
+            </p>
+          </div>
         </div>
       </div>
     );
