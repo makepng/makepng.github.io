@@ -16,6 +16,39 @@ import { Button } from './ui/Button';
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ACCEPT_STRING = '.jpg,.jpeg,.png,.webp';
 
+const DEFAULT_LABELS = {
+  dropActive: 'Drop your image here',
+  dropInactive: 'Drag & drop your image here',
+  dropHint: 'or tap to browse files · JPG, PNG, WebP',
+  trySample: 'Try Sample Image',
+  speedBadge: '⚡',
+  speedCallout1: '1st run caches the AI model',
+  speedCallout2: 'All next removals are instant (1–2s)!',
+  statusInitializing: 'Initializing AI engine…',
+  statusDownloading: 'Downloading AI model to cache…',
+  statusInference: 'Removing background…',
+  statusProcessing: 'Processing…',
+  progressComplete: 'complete',
+  cacheAlertTitle: '⚡ One-Time AI Cache Setup',
+  cacheAlertLine1: 'The first time takes a few extra seconds to download the AI model.',
+  cacheAlertLine2:
+    'Once cached in your browser, all future images will process super fast & instantly (1–2s) with 100% privacy!',
+  errorTitle: 'Something went wrong',
+  errorDefault:
+    'Background removal failed. Please try a different image or refresh the page.',
+  errorUnsupported:
+    'Unsupported format. Please upload a JPG, PNG, or WebP image.',
+  errorSample:
+    'Could not load sample image. Please upload an image directly.',
+  errorTryAgain: 'Try Again',
+  previewOriginal: 'Original',
+  previewRemoved: 'Background Removed',
+  btnOriginal: 'Original',
+  btnShowResult: 'Show Result',
+  btnNewImage: 'New Image',
+  btnDownload: 'Download PNG',
+};
+
 /**
  * Generate a small canvas-based sample image (sky gradient + human-like
  * silhouette) so "Try Sample Image" works even without a shipped asset.
@@ -74,7 +107,9 @@ function generateSampleBlob() {
    BackgroundRemover — 4-phase state-machine component
    idle → processing → done  (or → error at any stage)
    ======================================================== */
-export default function BackgroundRemover() {
+export default function BackgroundRemover({ labels = {} }) {
+  const t = { ...DEFAULT_LABELS, ...labels };
+
   /* ----- state ----- */
   const [phase, setPhase] = useState('idle'); // idle | processing | done | error
   const [originalUrl, setOriginalUrl] = useState(null);
@@ -133,7 +168,7 @@ export default function BackgroundRemover() {
       setError(null);
       setProgress(0);
       setShowOriginal(false);
-      setStatusMessage('Initializing AI engine…');
+      setStatusMessage(t.statusInitializing);
       setFileName(name.replace(/\.[^/.]+$/, '') + '_no_bg.png');
 
       // 3. Allow browser to paint the uploaded image before heavy WASM inference
@@ -153,7 +188,7 @@ export default function BackgroundRemover() {
             if (key.includes('fetch')) {
               // Model download phase (0 → 60 %)
               setStatusMessage(
-                `Downloading AI model to cache… ${Math.round(pct * 100)}%`
+                `${t.statusDownloading} ${Math.round(pct * 100)}%`
               );
               setProgress(pct * 0.6);
             } else if (
@@ -161,10 +196,10 @@ export default function BackgroundRemover() {
               key.includes('inference')
             ) {
               // Inference phase (60 → 100 %)
-              setStatusMessage('Removing background…');
+              setStatusMessage(t.statusInference);
               setProgress(0.6 + pct * 0.4);
             } else {
-              setStatusMessage('Processing…');
+              setStatusMessage(t.statusProcessing);
             }
           },
         });
@@ -177,14 +212,11 @@ export default function BackgroundRemover() {
         setPhase('done');
       } catch (err) {
         console.error('[BackgroundRemover] AI processing failed:', err);
-        setError(
-          err?.message ||
-            'Background removal failed. Please try a different image or refresh the page.'
-        );
+        setError(err?.message || t.errorDefault);
         setPhase('error');
       }
     },
-    [revokeUrls]
+    [revokeUrls, t]
   );
 
   /* ==========================
@@ -194,13 +226,13 @@ export default function BackgroundRemover() {
     (file) => {
       if (!file) return;
       if (!ACCEPTED_TYPES.includes(file.type)) {
-        setError('Unsupported format. Please upload a JPG, PNG, or WebP image.');
+        setError(t.errorUnsupported);
         setPhase('error');
         return;
       }
       processImage(file, file.name);
     },
-    [processImage]
+    [processImage, t.errorUnsupported]
   );
 
   /* ==========================
@@ -258,11 +290,11 @@ export default function BackgroundRemover() {
         if (blob) await processImage(blob, 'sample.png');
       } catch (fallbackErr) {
         console.error('Failed to generate fallback sample:', fallbackErr);
-        setError('Could not load sample image. Please upload an image directly.');
+        setError(t.errorSample);
         setPhase('error');
       }
     }
-  }, [processImage]);
+  }, [processImage, t.errorSample]);
 
   /* ==========================
      Download Handler
@@ -323,8 +355,8 @@ export default function BackgroundRemover() {
             focus-visible:ring-[#26b0a1] focus-visible:ring-offset-2
             ${
               dragActive
-                ? 'border-[#26b0a1] bg-[#f0fbf9] scale-[1.01] shadow-lg ring-4 ring-[#26b0a1]/20'
-                : 'border-[#b0ece2] hover:border-[#26b0a1] bg-white hover:bg-[#f0fbf9]/40 shadow-sm hover:shadow-md'
+                ? 'border-[#26b0a1] bg-[#f0fbf9] dark:bg-teal-950/40 scale-[1.01] shadow-lg ring-4 ring-[#26b0a1]/20'
+                : 'border-[#b0ece2] dark:border-teal-900/60 hover:border-[#26b0a1] dark:hover:border-teal-400 bg-white dark:bg-slate-900 hover:bg-[#f0fbf9]/40 dark:hover:bg-slate-850 shadow-sm hover:shadow-md'
             }
           `}
         >
@@ -341,24 +373,22 @@ export default function BackgroundRemover() {
             <div
               className={`rounded-2xl p-3.5 sm:p-5 transition-colors duration-300 ${
                 dragActive
-                  ? 'bg-[#d6f5f0] text-[#1e9387]'
-                  : 'bg-[#f0fbf9] text-[#26b0a1] border border-[#b0ece2]/70'
+                  ? 'bg-[#d6f5f0] dark:bg-teal-900/60 text-[#1e9387] dark:text-teal-300'
+                  : 'bg-[#f0fbf9] dark:bg-teal-950/50 text-[#26b0a1] dark:text-teal-400 border border-[#b0ece2]/70 dark:border-teal-800/60'
               }`}
             >
               <Upload
-                className="h-8 w-8 sm:h-10 sm:w-10 text-[#26b0a1]"
+                className="h-8 w-8 sm:h-10 sm:w-10 text-[#26b0a1] dark:text-teal-400"
                 strokeWidth={1.8}
               />
             </div>
 
             <div className="px-2">
-              <p className="text-base sm:text-xl font-bold text-slate-800">
-                {dragActive
-                  ? 'Drop your image here'
-                  : 'Drag & drop your image here'}
+              <p className="text-base sm:text-xl font-bold text-slate-800 dark:text-slate-100">
+                {dragActive ? t.dropActive : t.dropInactive}
               </p>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                or tap to browse files · JPG, PNG, WebP
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {t.dropHint}
               </p>
             </div>
           </div>
@@ -372,22 +402,24 @@ export default function BackgroundRemover() {
               e.stopPropagation();
               handleSampleImage();
             }}
-            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-[#1c756d]
-                       bg-[#f0fbf9] hover:bg-[#d6f5f0] active:bg-[#b0ece2] border border-[#b0ece2]
-                       font-semibold px-4 py-2 rounded-xl transition-all duration-200 shadow-2xs active:scale-95
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-[#1c756d] dark:text-teal-300
+                       bg-[#f0fbf9] dark:bg-teal-950/50 hover:bg-[#d6f5f0] dark:hover:bg-teal-900/60 active:bg-[#b0ece2] border border-[#b0ece2] dark:border-teal-800/80
+                       font-semibold px-4 py-2 rounded-xl transition-all duration-200 shadow-2xs active:scale-95 cursor-pointer
                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#26b0a1]"
           >
-            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#26b0a1]" />
-            Try Sample Image
+            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#26b0a1] dark:text-teal-400" />
+            {t.trySample}
           </button>
 
           {/* Prominent Eye-Catching UX Speed Banner */}
-          <div className="w-full max-w-lg mt-1 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-teal-50/90 via-emerald-50/90 to-teal-50/90 border border-[#7de0d2] shadow-2xs">
-            <p className="text-xs sm:text-sm font-semibold text-[#145d56] flex items-center justify-center gap-2">
+          <div className="w-full max-w-lg mt-1 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-teal-50/90 via-emerald-50/90 to-teal-50/90 dark:from-teal-950/40 dark:via-emerald-950/40 dark:to-teal-950/40 border border-[#7de0d2] dark:border-teal-800/80 shadow-2xs">
+            <p className="text-xs sm:text-sm font-semibold text-[#145d56] dark:text-teal-200 flex items-center justify-center gap-2">
               <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#26b0a1] text-white text-xs shrink-0 shadow-2xs">
-                ⚡
+                {t.speedBadge}
               </span>
-              <span><strong>1st run caches the AI model</strong> · All next removals are <strong>instant (1–2s)</strong>!</span>
+              <span>
+                <strong>{t.speedCallout1}</strong> · {t.speedCallout2}
+              </span>
             </p>
           </div>
         </div>
@@ -399,10 +431,10 @@ export default function BackgroundRemover() {
   if (phase === 'processing') {
     return (
       <div className="w-full max-w-2xl mx-auto px-1 sm:px-0">
-        <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-5 sm:p-8 shadow-sm">
+        <div className="rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 sm:p-8 shadow-sm">
           {/* Visible original image preview with AI scan effect */}
           {originalUrl && (
-            <div className="relative mb-5 sm:mb-6 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-50 border border-slate-200/80 flex items-center justify-center p-3 sm:p-4">
+            <div className="relative mb-5 sm:mb-6 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 flex items-center justify-center p-3 sm:p-4">
               <img
                 src={originalUrl}
                 alt="Uploaded photo"
@@ -421,7 +453,7 @@ export default function BackgroundRemover() {
           >
             <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 text-brand-500 animate-spin" />
 
-            <p className="text-sm sm:text-base font-bold text-slate-800 px-2">
+            <p className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 px-2">
               {statusMessage}
             </p>
 
@@ -432,29 +464,29 @@ export default function BackgroundRemover() {
                 aria-valuenow={Math.round(progress * 100)}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                className="bg-slate-100 rounded-full h-2.5 sm:h-3 overflow-hidden shadow-inner"
+                className="bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 sm:h-3 overflow-hidden shadow-inner"
               >
                 <div
                   className="bg-gradient-to-r from-brand-400 via-brand-500 to-teal-600 h-full rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${Math.round(progress * 100)}%` }}
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1.5 font-semibold">
-                {Math.round(progress * 100)}% complete
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 font-semibold">
+                {Math.round(progress * 100)}% {t.progressComplete}
               </p>
             </div>
           </div>
 
           {/* High-Impact Eye-Catching Speed & Performance Callout */}
-          <div className="mt-6 sm:mt-7 rounded-2xl bg-gradient-to-r from-[#f0fbf9] via-[#e2f8f4] to-[#f0fbf9] border-2 border-[#7de0d2] p-4 text-center shadow-xs">
+          <div className="mt-6 sm:mt-7 rounded-2xl bg-gradient-to-r from-[#f0fbf9] via-[#e2f8f4] to-[#f0fbf9] dark:from-teal-950/40 dark:via-teal-900/30 dark:to-teal-950/40 border-2 border-[#7de0d2] dark:border-teal-800 p-4 text-center shadow-xs">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#26b0a1] text-white text-[11px] font-bold mb-1.5 shadow-2xs">
-              ⚡ One-Time AI Cache Setup
+              {t.cacheAlertTitle}
             </div>
-            <p className="text-xs sm:text-sm text-[#145d56] font-bold">
-              The first time takes a few extra seconds to download the AI model.
+            <p className="text-xs sm:text-sm text-[#145d56] dark:text-teal-200 font-bold">
+              {t.cacheAlertLine1}
             </p>
-            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-              Once cached in your browser, all future images will process <strong>super fast & instantly (1–2s)</strong> with 100% privacy!
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+              {t.cacheAlertLine2}
             </p>
           </div>
         </div>
@@ -466,24 +498,29 @@ export default function BackgroundRemover() {
   if (phase === 'error') {
     return (
       <div className="w-full max-w-2xl mx-auto px-1 sm:px-0">
-        <div className="rounded-2xl sm:rounded-3xl border border-red-200 bg-red-50 p-6 sm:p-8 shadow-sm text-center">
+        <div className="rounded-2xl sm:rounded-3xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/30 p-6 sm:p-8 shadow-sm text-center">
           <div className="flex flex-col items-center gap-4">
-            <div className="rounded-2xl bg-red-100 p-3.5 sm:p-4">
-              <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-red-500" />
+            <div className="rounded-2xl bg-red-100 dark:bg-red-900/50 p-3.5 sm:p-4">
+              <AlertCircle className="h-7 w-7 sm:h-8 sm:w-8 text-red-500 dark:text-red-400" />
             </div>
 
             <div>
-              <p className="text-sm sm:text-base font-semibold text-red-800">
-                Something went wrong
+              <p className="text-sm sm:text-base font-semibold text-red-800 dark:text-red-200">
+                {t.errorTitle}
               </p>
-              <p className="text-xs sm:text-sm text-red-600 mt-1 max-w-md mx-auto">
+              <p className="text-xs sm:text-sm text-red-600 dark:text-red-300 mt-1 max-w-md mx-auto">
                 {error}
               </p>
             </div>
 
-            <Button variant="secondary" size="md" onClick={handleReset} className="w-full sm:w-auto">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={handleReset}
+              className="w-full sm:w-auto"
+            >
               <RotateCcw className="h-4 w-4" />
-              Try Again
+              {t.errorTryAgain}
             </Button>
           </div>
         </div>
@@ -494,27 +531,27 @@ export default function BackgroundRemover() {
   /* ---------- PHASE: done — Preview + Export ---------- */
   return (
     <div className="w-full max-w-2xl mx-auto px-1 sm:px-0">
-      <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300">
+      <div className="rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300">
         {/* Image preview on checkered transparency background */}
         <div className="relative bg-checkered flex items-center justify-center min-h-[220px] sm:min-h-[340px] max-h-[55vh] sm:max-h-[65vh] p-3 sm:p-6 overflow-hidden">
           <img
             src={showOriginal ? originalUrl : processedUrl}
-            alt={showOriginal ? 'Original image' : 'Background removed'}
+            alt={showOriginal ? t.previewOriginal : t.previewRemoved}
             className="max-h-[48vh] sm:max-h-[28rem] w-auto max-w-full object-contain select-none transition-all duration-200"
           />
 
           {/* Status badge */}
           <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3">
-            <span className="inline-flex items-center gap-1 sm:gap-1.5 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] sm:text-xs font-medium px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full select-none shadow-xs">
+            <span className="inline-flex items-center gap-1 sm:gap-1.5 bg-slate-900/75 dark:bg-slate-950/80 backdrop-blur-sm text-white text-[10px] sm:text-xs font-medium px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full select-none shadow-xs">
               {showOriginal ? (
                 <>
                   <Eye className="h-3 w-3" />
-                  Original
+                  {t.previewOriginal}
                 </>
               ) : (
                 <>
                   <Sparkles className="h-3 w-3 text-amber-300" />
-                  Background Removed
+                  {t.previewRemoved}
                 </>
               )}
             </span>
@@ -522,7 +559,7 @@ export default function BackgroundRemover() {
         </div>
 
         {/* Action bar (Responsive: stacked on mobile with full width buttons, row on tablet/desktop) */}
-        <div className="p-3.5 sm:p-5 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-slate-100 bg-slate-50/50">
+        <div className="p-3.5 sm:p-5 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
           {/* Secondary actions */}
           <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
             <Button
@@ -534,12 +571,12 @@ export default function BackgroundRemover() {
               {showOriginal ? (
                 <>
                   <EyeOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  Show Result
+                  {t.btnShowResult}
                 </>
               ) : (
                 <>
                   <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  Original
+                  {t.btnOriginal}
                 </>
               )}
             </Button>
@@ -548,10 +585,10 @@ export default function BackgroundRemover() {
               variant="ghost"
               size="sm"
               onClick={handleReset}
-              className="w-full sm:w-auto justify-center text-xs sm:text-sm py-2 bg-white sm:bg-transparent border border-slate-200 sm:border-transparent"
+              className="w-full sm:w-auto justify-center text-xs sm:text-sm py-2 bg-white dark:bg-slate-800 sm:bg-transparent dark:sm:bg-transparent border border-slate-200 dark:border-slate-700 sm:border-transparent dark:sm:border-transparent"
             >
               <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              New Image
+              {t.btnNewImage}
             </Button>
           </div>
 
@@ -563,7 +600,7 @@ export default function BackgroundRemover() {
             className="w-full sm:w-auto justify-center py-2.5 sm:py-3 shadow-md hover:shadow-lg"
           >
             <Download className="h-4 w-4 sm:h-5 sm:w-5" />
-            Download PNG
+            {t.btnDownload}
           </Button>
         </div>
       </div>

@@ -5,9 +5,9 @@ const variants = {
   primary:
     'bg-[#26b0a1] hover:bg-[#1e9387] text-white font-semibold shadow-md shadow-[#26b0a1]/25 hover:shadow-lg hover:shadow-[#26b0a1]/35',
   secondary:
-    'bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium',
+    'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium border border-slate-200 dark:border-slate-700',
   ghost:
-    'bg-transparent hover:bg-slate-100 text-slate-600',
+    'bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300',
 };
 
 const sizes = {

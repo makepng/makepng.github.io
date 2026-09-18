@@ -1,0 +1,17 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import HomePage from '../../components/HomePage.astro';
+import { LOCALES, type SupportedLocale } from '../../i18n/ui';
+
+export async function getStaticPaths() {
+  return LOCALES.filter((locale) => locale !== 'en').map((lang) => ({
+    params: { lang },
+  }));
+}
+
+const { lang } = Astro.params as { lang: SupportedLocale };
+---
+
+<Layout lang={lang}>
+  <HomePage lang={lang} />
+</Layout>

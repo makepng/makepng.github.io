@@ -35,4 +35,12 @@
       10px -10px,
       -10px 0px;
   }
+  .dark .bg-checkered {
+    background-color: #0f172a;
+    background-image:
+      linear-gradient(45deg, #1e293b 25%, transparent 25%),
+      linear-gradient(-45deg, #1e293b 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1e293b 75%),
+      linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+  }
 }

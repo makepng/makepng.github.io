@@ -1,0 +1,166 @@
+---
+import { LOCALES, LOCALE_MAP, type SupportedLocale } from '../i18n/ui';
+import { getLangFromUrl, getLocalizedPath } from '../i18n/utils';
+
+interface Props {
+  currentLang?: SupportedLocale;
+  className?: string;
+}
+
+const { currentLang: propLang, className = '' } = Astro.props;
+const currentLang = propLang || getLangFromUrl(Astro.url);
+const currentLocaleInfo = LOCALE_MAP[currentLang];
+const currentPathname = Astro.url.pathname;
+---
+
+<div class={`relative inline-block text-left language-picker-container ${className}`}>
+  <!-- Dropdown Trigger Button -->
+  <button
+    type="button"
+    class="language-picker-btn inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-medium rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-all duration-200 shadow-2xs hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#26b0a1] cursor-pointer"
+    aria-expanded="false"
+    aria-haspopup="true"
+    aria-label={`Current language: ${currentLocaleInfo.name}. Select language`}
+  >
+    <span class="text-sm leading-none" aria-hidden="true">{currentLocaleInfo.flag}</span>
+    <span class="font-semibold text-slate-800 dark:text-slate-200 hidden sm:inline">
+      {currentLocaleInfo.name}
+    </span>
+    <span class="font-semibold text-slate-800 dark:text-slate-200 sm:hidden uppercase">
+      {currentLocaleInfo.code}
+    </span>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform duration-200 chevron-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m6 9 6 6 6-6"></path>
+    </svg>
+  </button>
+
+  <!-- Dropdown Menu -->
+  <div
+    class="language-dropdown-menu hidden absolute right-0 mt-1.5 w-44 origin-top-right rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-1.5 shadow-xl ring-1 ring-black/5 z-50 transition-all duration-150"
+    role="menu"
+    aria-orientation="vertical"
+  >
+    {
+      LOCALES.map((locale) => {
+        const info = LOCALE_MAP[locale];
+        const isSelected = locale === currentLang;
+        const targetHref = getLocalizedPath(currentPathname, locale);
+
+        return (
+          <a
+            href={targetHref}
+            role="menuitem"
+            class={`flex items-center justify-between px-3 py-2 text-xs sm:text-sm rounded-xl font-medium transition-colors ${
+              isSelected
+                ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 font-semibold'
+                : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <div class="flex items-center gap-2.5">
+              <span class="text-base leading-none" aria-hidden="true">{info.flag}</span>
+              <span>{info.name}</span>
+            </div>
+            {isSelected && (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </a>
+        );
+      })
+    }
+  </div>
+</div>
+
+<script is:inline>
+  function setupLanguagePickers() {
+    const pickers = document.querySelectorAll('.language-picker-container');
+
+    pickers.forEach((container) => {
+      const btn = container.querySelector('.language-picker-btn');
+      const menu = container.querySelector('.language-dropdown-menu');
+      const chevron = container.querySelector('.chevron-icon');
+
+      if (!btn || !menu) return;
+
+      const toggleMenu = (show) => {
+        const isCurrentlyHidden = menu.classList.contains('hidden');
+        const shouldShow = show !== undefined ? show : isCurrentlyHidden;
+
+        if (shouldShow) {
+          // Close all other open language menus first
+          document.querySelectorAll('.language-dropdown-menu').forEach((m) => {
+            if (m !== menu) m.classList.add('hidden');
+          });
+          document.querySelectorAll('.chevron-icon').forEach((c) => {
+            if (c !== chevron) c.classList.remove('rotate-180');
+          });
+
+          menu.classList.remove('hidden');
+          btn.setAttribute('aria-expanded', 'true');
+          if (chevron) chevron.classList.add('rotate-180');
+        } else {
+          menu.classList.add('hidden');
+          btn.setAttribute('aria-expanded', 'false');
+          if (chevron) chevron.classList.remove('rotate-180');
+        }
+      };
+
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        toggleMenu();
+      };
+    });
+
+    // Close when clicking outside
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.language-dropdown-menu').forEach((menu) => {
+        menu.classList.add('hidden');
+      });
+      document.querySelectorAll('.language-picker-btn').forEach((btn) => {
+        btn.setAttribute('aria-expanded', 'false');
+      });
+      document.querySelectorAll('.chevron-icon').forEach((chevron) => {
+        chevron.classList.remove('rotate-180');
+      });
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.language-dropdown-menu').forEach((menu) => {
+          menu.classList.add('hidden');
+        });
+        document.querySelectorAll('.language-picker-btn').forEach((btn) => {
+          btn.setAttribute('aria-expanded', 'false');
+        });
+        document.querySelectorAll('.chevron-icon').forEach((chevron) => {
+          chevron.classList.remove('rotate-180');
+        });
+      }
+    });
+  }
+
+  setupLanguagePickers();
+  document.addEventListener('astro:after-swap', setupLanguagePickers);
+</script>
